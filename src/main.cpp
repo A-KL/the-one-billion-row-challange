@@ -14,6 +14,10 @@
 #include <Windows.h>
 #endif
 
+#ifndef CSV_FILE
+#define CSV_FILE "C:\\Sources\\1brc-main\\measurements.txt"
+#endif // !CSV_FILE
+
 struct city_info_avg_t {
 
     void add_temp(float temp) {
@@ -113,8 +117,6 @@ std::ostream& operator<<(std::ostream& os, const city_info_t& info)
         << info.max_temp();
 }
 
-const auto file_path = "C:\\Sources\\1brc-main\\measurements.txt";
-
 const auto processor_count = std::thread::hardware_concurrency();
 
 std::vector<std::thread> _threads(processor_count);
@@ -167,7 +169,7 @@ static int get_pos(const unsigned char* input, const unsigned char character, co
 
 static void run_work(long start, long offset) {
 
-    MemoryMapped mapped_file(file_path, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
+    MemoryMapped mapped_file(CSV_FILE, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
 
     if (!mapped_file.isValid()) {
         std::cout << "Can't open the file" << std::endl;
@@ -247,16 +249,21 @@ static void print_results()
     std::cout << "}" << std::endl;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 #ifdef _MSC_VER
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
 
+    //if (argc <= 1) {
+    //    std::cout << "A file path needs to be specified." << std::endl;
+    //    return 1;
+    //}
+
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
-    auto size_per_processor = file_size(file_path) / processor_count;
+    auto size_per_processor = file_size(CSV_FILE) / processor_count;
 
     for (int i = 0; i < _threads.size(); i++) {
         _threads[i] = std::thread(run_work, i * size_per_processor, size_per_processor);
@@ -271,4 +278,6 @@ int main()
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
     std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "s" << std::endl;
+
+    return 0;
 }
