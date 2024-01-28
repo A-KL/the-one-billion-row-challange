@@ -113,6 +113,21 @@ bool MemoryMapped::open(const std::string& filename, size_t mappedBytes, CacheHi
   if (!_mappedFile)
     return false;
 
+#endif
+#ifdef MAC_OS
+  // open file
+  _file = ::open(filename.c_str(), O_RDONLY);
+  if (_file == -1) {
+    _file = 0;
+    return false;
+  }
+
+  // file size
+  struct stat statInfo;
+  if (fstat(_file, &statInfo) < 0)
+    return false;
+
+  _filesize = statInfo.st_size;
 #else
 
   // Linux
@@ -275,10 +290,15 @@ bool MemoryMapped::remap(uint64_t offset, size_t mappedBytes)
   return true;
 
 #else
-
+  #ifdef MAC_OS
+    // Linux
+  // new mapping
+  _mappedView = ::mmap(NULL, mappedBytes, PROT_READ, MAP_SHARED, _file, offset);
+  #elif
   // Linux
   // new mapping
   _mappedView = ::mmap64(NULL, mappedBytes, PROT_READ, MAP_SHARED, _file, offset);
+  #endif
   if (_mappedView == MAP_FAILED)
   {
     _mappedBytes = 0;
