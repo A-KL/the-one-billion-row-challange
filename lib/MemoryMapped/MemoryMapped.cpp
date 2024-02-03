@@ -128,8 +128,7 @@ bool MemoryMapped::open(const std::string& filename, size_t mappedBytes, CacheHi
     return false;
 
   _filesize = statInfo.st_size;
-#else
-
+#elif Linux
   // Linux
 
   // open file

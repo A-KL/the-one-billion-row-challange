@@ -74,6 +74,9 @@
     <IncludePath>lib\MemoryMapped;$(IncludePath)</IncludePath>
     <SourcePath>\lib\MemoryMapped;$(SourcePath)</SourcePath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>.\lib\MemoryMapped\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -137,6 +140,7 @@
     <ClCompile Include="src/main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="city_info_avg_t.h" />
     <ClInclude Include="lib\MemoryMapped\MemoryMapped.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

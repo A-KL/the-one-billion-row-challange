@@ -26,5 +26,8 @@
     <ClInclude Include="lib\MemoryMapped\MemoryMapped.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="city_info_avg_t.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
