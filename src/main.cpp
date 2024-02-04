@@ -19,8 +19,49 @@
 
 struct string_vector_t
 {
-    unsigned char* start;
+    const unsigned char* start;
     unsigned int size;
+
+    bool operator == (string_vector_t const& other) const
+    {
+        return memcmp(start, other.start, size) == 0;
+    }
+
+    bool operator < (string_vector_t const& other) const
+    {
+        return memcmp(start, other.start, size) < 0;
+    }
+};
+
+std::ostream& operator<<(std::ostream& os, const string_vector_t& string)
+{
+    for (unsigned i=0; i < string.size; ++i)
+    {
+        os << string.start[i];
+    }
+    return os;
+}
+
+template<>
+struct std::hash<string_vector_t> {
+
+	using argument_type = string_vector_t;
+	using result_type = size_t;
+
+	size_t operator()(const string_vector_t& r) const noexcept
+	{
+		constexpr std::hash<unsigned char> start_hash;
+		constexpr std::hash<unsigned int> size_hash;
+
+        auto result = size_hash(r.size);
+
+        for (unsigned i=0; i < r.size; i++)
+        {
+            result ^= start_hash(r.start[i]);
+        }
+
+        return result;
+	}
 };
 
 struct city_info_t {
@@ -86,9 +127,9 @@ std::ostream& operator<<(std::ostream& os, const city_info_t& info)
 
 const auto processor_count = std::thread::hardware_concurrency();
 
-std::vector<std::thread> _threads(processor_count);
+std::vector<std::thread> threads(processor_count);
 
-std::unordered_map<std::string, city_info_t> cities;
+std::unordered_map<string_vector_t, city_info_t> _cities;
 
 std::mutex cities_mutex;
 
@@ -134,19 +175,10 @@ static int get_pos(const unsigned char* input, const unsigned char character, co
     return read;
 }
 
-static void run_work(long start, long offset) {
+static void run_work(const unsigned char * input, long start, const long offset) {
 
-    MemoryMapped mapped_file(CSV_FILE, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
+    std::unordered_map<string_vector_t, city_info_t> cities;
 
-    if (!mapped_file.isValid()) {
-        std::cout << "Can't open the file" << std::endl;
-        return;
-    }
-
-    auto input = mapped_file.getData();
-    std::unordered_map<std::string, city_info_t> _cities;
-
-    char city_name[30];
     char city_temp[10];
 
     int read = 0;
@@ -158,14 +190,18 @@ static void run_work(long start, long offset) {
 
     while (true)
     {
-        memset(city_name, 0, sizeof(city_name));
         memset(city_temp, 0, sizeof(city_temp));
 
-        read = copy_until(input, city_name, ';', start + block_position);
+        string_vector_t city_name { input + start + block_position, 0 };
+
+        read = get_pos(input, ';', start + block_position);
+       // read = copy_until(input, city_name, ';', start + block_position);
         if (read == 0)
         {
             break;
         }
+
+        city_name.size = read;
 
         block_position += read + 1;
 
@@ -177,19 +213,17 @@ static void run_work(long start, long offset) {
 
         block_position += read + 1;
 ;
-        _cities[city_name].add_temp(atof(city_temp));
+        cities[city_name].add_temp(atof(city_temp));
 
         if (block_position >= offset) {
             break;
         }
     }
 
-    mapped_file.close();
-
     cities_mutex.lock();
 
-    for (const auto& pair : _cities) {
-        auto& city = cities[pair.first];
+    for (const auto& pair : cities) {
+        auto& city = _cities[pair.first];
         for (const auto temp : pair.second) {
             city.add_temp(temp);
         }
@@ -202,10 +236,10 @@ static void print_results()
 {
     std::cout << "{";
 
-    auto i = cities.size();
+    auto i = _cities.size();
 
     // Sort 'unordered_map' by iterating over a new sorted 'map'
-    std::map<std::string, city_info_t> ordered_cities(cities.begin(), cities.end());
+    const std::map ordered_cities(_cities.begin(), _cities.end());
 
     for (auto const& pair : ordered_cities) {
         std::cout << pair.first << "=" << pair.second;
@@ -213,7 +247,7 @@ static void print_results()
             std::cout << ", ";
     }
 
-    std::cout << "}" << std::endl;
+    std::cout << "}\n";
 }
 
 int main(int argc, char* argv[])
@@ -223,6 +257,17 @@ int main(int argc, char* argv[])
     SetConsoleCP(CP_UTF8);
 #endif
 
+ //   std::vector<string_vector_t> test;
+
+	//const auto test_string =  reinterpret_cast<const unsigned char*>("some test string!");
+
+ //   const auto test_string2 = reinterpret_cast<const unsigned char*>("some test string!");
+
+ //   string_vector_t vector1 { test_string, sizeof(test_string)};
+ //   string_vector_t vector2 { test_string2, sizeof(test_string2) };
+
+ //   auto r = vector1 == vector2;
+
     //if (argc <= 1) {
     //    std::cout << "A file path needs to be specified." << std::endl;
     //    return 1;
@@ -230,17 +275,26 @@ int main(int argc, char* argv[])
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
-    auto size_per_processor = file_size(CSV_FILE) / processor_count;
+    MemoryMapped mapped_file(CSV_FILE, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
 
-    for (int i = 0; i < _threads.size(); i++) {
-        _threads[i] = std::thread(run_work, i * size_per_processor, size_per_processor);
+    if (!mapped_file.isValid()) {
+        std::cout << "Can't open the file\n";
+        return 1;
     }
 
-    for (auto& thread : _threads) {
+    auto size_per_processor = file_size(CSV_FILE) / processor_count;
+
+    for (int i = 0; i < threads.size(); i++) {
+	    threads[i] = std::thread(run_work, mapped_file.getData(), i * size_per_processor, size_per_processor);
+    }
+
+    for (auto& thread : threads) {
         thread.join();
     }
 
     print_results();
+
+    mapped_file.close();
     
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
