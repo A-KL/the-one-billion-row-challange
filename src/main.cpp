@@ -7,14 +7,14 @@
 #include <filesystem>
 #include <map>
 #include <unordered_map>
-#include "MemoryMapped.h"
+#include <MemoryMapped.h>
 
 #ifdef _MSC_VER
 #include <Windows.h>
 #endif
 
 #ifndef CSV_FILE
-#define CSV_FILE "..\\1brc\\measurements.txt"
+#define CSV_FILE "../1brc/measurements.txt"
 #endif
 
 struct string_vector_t
@@ -91,11 +91,6 @@ std::vector<std::thread> threads(processor_count);
 std::unordered_map<std::string, city_info_t> cities;
 
 std::mutex cities_mutex;
-
-static unsigned long file_size(const char* filename) {
-    std::filesystem::path p { filename };
-    return std::filesystem::file_size(p);
-}
 
 static int copy_until(const unsigned char* input, char* output, const char stop_character = '\n', const int input_pos = 0) {
 
@@ -229,14 +224,16 @@ int main(int argc, char* argv[])
     //    return 1;
     //}
 
-    const auto file_name = std::filesystem::current_path().append(CSV_FILE).generic_string();
+    //std::cout << std::filesystem::current_path() << "\n";
+
+    const auto file_path = std::filesystem::path{ CSV_FILE }.generic_string();
 
     const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
-    auto size_per_processor = file_size(CSV_FILE) / processor_count;
+    auto size_per_processor = std::filesystem::file_size(file_path) / processor_count;
 
     for (auto i = 0; i < threads.size(); i++) {
-        threads[i] = std::thread(run_work, file_name,  i * size_per_processor, size_per_processor);
+        threads[i] = std::thread(run_work, file_path,  i * size_per_processor, size_per_processor);
     }
 
     for (auto& thread : threads) {
