@@ -14,8 +14,8 @@
 #endif
 
 #ifndef CSV_FILE
-#define CSV_FILE "C:\\Users\\Anatolii.Klots\\Downloads\\1brc-main\\1brc-main\\measurements.txt"
-#endif // !CSV_FILE
+#define CSV_FILE "..\\1brc\\measurements.txt"
+#endif
 
 struct string_vector_t
 {
@@ -86,7 +86,7 @@ std::ostream& operator<<(std::ostream& os, const city_info_t& info)
 
 const auto processor_count = std::thread::hardware_concurrency();
 
-std::vector<std::thread> _threads(processor_count);
+std::vector<std::thread> threads(processor_count);
 
 std::unordered_map<std::string, city_info_t> cities;
 
@@ -134,20 +134,18 @@ static int get_pos(const unsigned char* input, const unsigned char character, co
     return read;
 }
 
-static void run_work(long start, long offset) {
+static void run_work(std::string fileName, long start, long offset) {
 
-    MemoryMapped mapped_file(CSV_FILE, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
+    MemoryMapped mapped_file(fileName, MemoryMapped::WholeFile, MemoryMapped::SequentialScan);
 
     if (!mapped_file.isValid()) {
-        std::cout << "Can't open the file" << std::endl;
+        std::cout << "Can't open the file" << '\n';
         return;
     }
 
-    auto input = mapped_file.getData();
-    std::unordered_map<std::string, city_info_t> _cities;
+    const auto input = mapped_file.getData();
 
-    char city_name[30];
-    char city_temp[10];
+    std::unordered_map<std::string, city_info_t> _cities;
 
     int read = 0;
     int block_position = 0;
@@ -158,6 +156,9 @@ static void run_work(long start, long offset) {
 
     while (true)
     {
+        char city_name[30];
+        char city_temp[10];
+
         memset(city_name, 0, sizeof(city_name));
         memset(city_temp, 0, sizeof(city_temp));
 
@@ -205,7 +206,7 @@ static void print_results()
     auto i = cities.size();
 
     // Sort 'unordered_map' by iterating over a new sorted 'map'
-    std::map<std::string, city_info_t> ordered_cities(cities.begin(), cities.end());
+    const std::map ordered_cities(cities.begin(), cities.end());
 
     for (auto const& pair : ordered_cities) {
         std::cout << pair.first << "=" << pair.second;
@@ -213,7 +214,7 @@ static void print_results()
             std::cout << ", ";
     }
 
-    std::cout << "}" << std::endl;
+    std::cout << "}" << '\n';
 }
 
 int main(int argc, char* argv[])
@@ -228,23 +229,25 @@ int main(int argc, char* argv[])
     //    return 1;
     //}
 
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    const auto file_name = std::filesystem::current_path().append(CSV_FILE).generic_string();
+
+    const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     auto size_per_processor = file_size(CSV_FILE) / processor_count;
 
-    for (int i = 0; i < _threads.size(); i++) {
-        _threads[i] = std::thread(run_work, i * size_per_processor, size_per_processor);
+    for (auto i = 0; i < threads.size(); i++) {
+        threads[i] = std::thread(run_work, file_name,  i * size_per_processor, size_per_processor);
     }
 
-    for (auto& thread : _threads) {
+    for (auto& thread : threads) {
         thread.join();
     }
 
     print_results();
-    
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-    std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "s" << std::endl;
+    const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+    std::cout << "Time elapsed: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "s\n";
 
     return 0;
 }
